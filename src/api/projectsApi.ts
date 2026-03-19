@@ -1,6 +1,7 @@
 import type { Project, ProjectInput } from "../types/project";
 
 const STORAGE_KEY = "manageme_projects";
+const ACTIVE_PROJECT_KEY = "manageme_active_project_id";
 
 class ProjectsApi {
   private read(): Project[] {
@@ -10,8 +11,7 @@ class ProjectsApi {
 
     try {
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      return parsed;
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
       return [];
     }
@@ -64,6 +64,30 @@ class ProjectsApi {
   delete(id: string): void {
     const projects = this.read().filter((project) => project.id !== id);
     this.write(projects);
+
+    const activeId = this.getActiveProjectId();
+    if (activeId === id) {
+      this.setActiveProjectId(null);
+    }
+  }
+
+  getActiveProjectId(): string | null {
+    return localStorage.getItem(ACTIVE_PROJECT_KEY);
+  }
+
+  setActiveProjectId(id: string | null): void {
+    if (id) {
+      localStorage.setItem(ACTIVE_PROJECT_KEY, id);
+    } else {
+      localStorage.removeItem(ACTIVE_PROJECT_KEY);
+    }
+  }
+
+  getActiveProject(): Project | null {
+    const activeId = this.getActiveProjectId();
+    if (!activeId) return null;
+
+    return this.getById(activeId);
   }
 }
 
