@@ -1,28 +1,24 @@
+import { usersApi } from "./usersApi";
 import type { User } from "../types/user";
 
-const STORAGE_KEY = "manageme_current_user";
-
-const defaultUser: User = {
-  id: "user-1",
-  imie: "Jan",
-  nazwisko: "Kowalski",
-};
+const STORAGE_KEY = "manageme_current_user_id";
 
 class CurrentUserApi {
   getCurrentUser(): User {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const users = usersApi.getAll();
 
-    if (!raw) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultUser));
-      return defaultUser;
+    const adminUser =
+      users.find((user) => user.rola === "admin") ?? users[0];
+
+    const storedUserId = localStorage.getItem(STORAGE_KEY);
+    const storedUser = users.find((user) => user.id === storedUserId);
+
+    if (storedUser) {
+      return storedUser;
     }
 
-    try {
-      return JSON.parse(raw) as User;
-    } catch {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultUser));
-      return defaultUser;
-    }
+    localStorage.setItem(STORAGE_KEY, adminUser.id);
+    return adminUser;
   }
 }
 
