@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { currentUserApi } from "./api/currentUserApi";
+import { notificationsApi } from "./api/notificationsApi";
 import { projectsApi } from "./api/projectsApi";
 import { storiesApi } from "./api/storiesApi";
 import { tasksApi } from "./api/tasksApi";
 import { usersApi } from "./api/usersApi";
+import type { AppNotification, NotificationPriority } from "./types/notification";
 import type { Project, ProjectInput } from "./types/project";
 import type { Story, StoryInput, StoryPriority, StoryStatus } from "./types/story";
 import type { Task, TaskInput } from "./types/task";
@@ -95,6 +97,10 @@ function App() {
   const [detailAssigneeId, setDetailAssigneeId] = useState("");
   const [detailHours, setDetailHours] = useState("0");
 
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [popupNotification, setPopupNotification] = useState<AppNotification | null>(null);
+
   const activeProject = useMemo(
     () => projects.find((project) => project.id === activeProjectId) ?? null,
     [projects, activeProjectId]
@@ -110,6 +116,19 @@ function App() {
     [users]
   );
 
+  const unreadNotificationsCount = useMemo(
+    () => notifications.filter((item) => !item.read).length,
+    [notifications]
+  );
+
+  const todoStories = stories.filter((story) => story.stan === "todo");
+  const doingStories = stories.filter((story) => story.stan === "doing");
+  const doneStories = stories.filter((story) => story.stan === "done");
+
+  const todoTasks = tasks.filter((task) => task.stan === "todo");
+  const doingTasks = tasks.filter((task) => task.stan === "doing");
+  const doneTasks = tasks.filter((task) => task.stan === "done");
+
   const loadUsers = () => {
     setUsers(usersApi.getAll());
   };
@@ -118,6 +137,10 @@ function App() {
     const data = projectsApi.getAll();
     setProjects(data);
     setIsProjectsLoaded(true);
+  };
+
+  const loadNotifications = () => {
+    setNotifications(notificationsApi.getAll());
   };
 
   const loadProjectData = (projectId: string | null) => {
@@ -144,6 +167,7 @@ function App() {
   useEffect(() => {
     loadUsers();
     loadProjects();
+    loadNotifications();
   }, []);
 
   useEffect(() => {
@@ -218,6 +242,83 @@ function App() {
   const getStoryName = (storyId: string) => {
     const story = stories.find((item) => item.id === storyId);
     return story ? story.nazwa : "-";
+  };
+
+  const getNotificationBadgeClass = (priority: NotificationPriority) => {
+    switch (priority) {
+      case "high":
+        return "text-bg-danger";
+      case "medium":
+        return "text-bg-warning";
+      default:
+        return "text-bg-secondary";
+    }
+  };
+
+  const getUserAvatarGradient = (role: User["rola"]) => {
+    if (role === "admin") {
+      return "linear-gradient(180deg, #3b82f6, #1d4ed8)";
+    }
+
+    if (role === "developer") {
+      return "linear-gradient(180deg, #8b5cf6, #6d28d9)";
+    }
+
+    return "linear-gradient(180deg, #f59e0b, #d97706)";
+  };
+
+  const createNotification = (
+    title: string,
+    message: string,
+    priority: NotificationPriority = "low"
+  ) => {
+    const newNotification = notificationsApi.create({
+      title,
+      message,
+      priority,
+    });
+
+    loadNotifications();
+
+    if (priority === "medium" || priority === "high") {
+      setPopupNotification(newNotification);
+    }
+  };
+
+  const handleOpenNotifications = () => {
+    setShowNotifications((prev) => !prev);
+  };
+
+  const handleMarkNotificationRead = (id: string) => {
+    notificationsApi.markAsRead(id);
+    loadNotifications();
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    notificationsApi.markAllAsRead();
+    loadNotifications();
+  };
+
+  const handleDeleteNotification = (id: string) => {
+    notificationsApi.delete(id);
+    loadNotifications();
+  };
+
+  const handleClearNotifications = () => {
+    const confirmed = window.confirm("Na pewno usunąć wszystkie powiadomienia?");
+    if (!confirmed) return;
+
+    notificationsApi.clearAll();
+    loadNotifications();
+  };
+
+  const handleClosePopup = () => {
+    if (popupNotification) {
+      notificationsApi.markAsRead(popupNotification.id);
+      loadNotifications();
+    }
+
+    setPopupNotification(null);
   };
 
   const syncStoryStatusFromTasks = (storyId: string) => {
@@ -302,8 +403,18 @@ function App() {
 
     if (editingProjectId) {
       projectsApi.update(editingProjectId, payload);
+      createNotification(
+        "Zaktualizowano projekt",
+        `Projekt "${payload.nazwa}" został zaktualizowany.`,
+        "medium"
+      );
     } else {
       projectsApi.create(payload);
+      createNotification(
+        "Dodano projekt",
+        `Projekt "${payload.nazwa}" został utworzony.`,
+        "medium"
+      );
     }
 
     loadProjects();
@@ -334,8 +445,18 @@ function App() {
 
     if (editingStoryId) {
       storiesApi.update(editingStoryId, payload);
+      createNotification(
+        "Zaktualizowano historyjkę",
+        `Historyjka "${payload.nazwa}" została zaktualizowana.`,
+        "low"
+      );
     } else {
       storiesApi.create(payload);
+      createNotification(
+        "Dodano historyjkę",
+        `Historyjka "${payload.nazwa}" została dodana do projektu.`,
+        "low"
+      );
     }
 
     loadProjectData(activeProjectId);
@@ -400,6 +521,11 @@ function App() {
       const oldStoryId = existingTask.historyjkaId;
 
       tasksApi.update(editingTaskId, payload);
+      createNotification(
+        "Zaktualizowano zadanie",
+        `Zadanie "${payload.nazwa}" zostało zaktualizowane.`,
+        "low"
+      );
 
       syncStoryStatusFromTasks(oldStoryId);
       if (oldStoryId !== payload.historyjkaId) {
@@ -407,6 +533,11 @@ function App() {
       }
     } else {
       tasksApi.create(payload);
+      createNotification(
+        "Dodano zadanie",
+        `Zadanie "${payload.nazwa}" zostało utworzone.`,
+        "medium"
+      );
     }
 
     loadProjectData(activeProjectId);
@@ -440,6 +571,8 @@ function App() {
     storiesApi.deleteByProject(projectId);
     projectsApi.delete(projectId);
 
+    createNotification("Usunięto projekt", "Projekt został usunięty.", "high");
+
     if (activeProjectId === projectId) {
       projectsApi.setActiveProjectId(null);
       setActiveProjectId(null);
@@ -471,6 +604,12 @@ function App() {
     tasksApi.deleteByStoryId(storyId);
     storiesApi.delete(storyId);
 
+    createNotification(
+      "Usunięto historyjkę",
+      "Wybrana historyjka została usunięta.",
+      "medium"
+    );
+
     if (editingStoryId === storyId) {
       resetStoryForm();
     }
@@ -498,6 +637,12 @@ function App() {
     const task = tasks.find((item) => item.id === taskId);
 
     tasksApi.delete(taskId);
+
+    createNotification(
+      "Usunięto zadanie",
+      "Wybrane zadanie zostało usunięte.",
+      "medium"
+    );
 
     if (editingTaskId === taskId) {
       resetTaskForm();
@@ -546,6 +691,13 @@ function App() {
     };
 
     tasksApi.update(selectedTask.id, payload);
+
+    createNotification(
+      "Przypisano użytkownika",
+      `Do zadania "${selectedTask.nazwa}" przypisano ${getUserName(detailAssigneeId)}.`,
+      "high"
+    );
+
     syncStoryStatusFromTasks(selectedTask.historyjkaId);
     loadProjectData(activeProjectId);
     setSelectedTaskId(selectedTask.id);
@@ -609,18 +761,17 @@ function App() {
     };
 
     tasksApi.update(selectedTask.id, payload);
+
+    createNotification(
+      "Zadanie zakończone",
+      `Zadanie "${selectedTask.nazwa}" zostało oznaczone jako done.`,
+      "high"
+    );
+
     syncStoryStatusFromTasks(selectedTask.historyjkaId);
     loadProjectData(activeProjectId);
     setSelectedTaskId(selectedTask.id);
   };
-
-  const todoStories = stories.filter((story) => story.stan === "todo");
-  const doingStories = stories.filter((story) => story.stan === "doing");
-  const doneStories = stories.filter((story) => story.stan === "done");
-
-  const todoTasks = tasks.filter((task) => task.stan === "todo");
-  const doingTasks = tasks.filter((task) => task.stan === "doing");
-  const doneTasks = tasks.filter((task) => task.stan === "done");
 
   return (
     <div className="app-shell py-4">
@@ -628,7 +779,16 @@ function App() {
         <header className="card card-custom shadow-sm mb-4">
           <div className="card-body d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
             <div>
-              <h1 className="h2 mb-1">ManageMe</h1>
+              <h1 className="h2 mb-1">
+                <span
+                  style={{
+                    color: "#7fb2ff",
+                    textShadow: "0 0 18px rgba(59,130,246,0.35)",
+                  }}
+                >
+                  ManageMe
+                </span>
+              </h1>
               <p className="mb-0 text-secondary">
                 Zalogowany użytkownik:{" "}
                 <strong>
@@ -639,6 +799,19 @@ function App() {
             </div>
 
             <div className="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
+              <button
+                type="button"
+                className="btn btn-outline-dark position-relative"
+                onClick={handleOpenNotifications}
+              >
+                🔔 Powiadomienia
+                {unreadNotificationsCount > 0 && (
+                  <span className="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger">
+                    {unreadNotificationsCount}
+                  </span>
+                )}
+              </button>
+
               <div className="badge text-bg-primary fs-6 p-2">
                 Aktywny projekt: {activeProject ? activeProject.nazwa : "brak"}
               </div>
@@ -654,6 +827,88 @@ function App() {
           </div>
         </header>
 
+        {showNotifications && (
+          <section className="card card-custom shadow-sm mb-4">
+            <div className="card-body">
+              <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+                <h2 className="h4 mb-0 d-flex align-items-center gap-2">
+                  <span style={{ color: "#fbbf24" }}>🔔</span>
+                  <span>Powiadomienia</span>
+                </h2>
+
+                <div className="d-flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-secondary"
+                    onClick={handleMarkAllNotificationsRead}
+                  >
+                    Oznacz wszystkie jako przeczytane
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-danger"
+                    onClick={handleClearNotifications}
+                  >
+                    Usuń wszystkie
+                  </button>
+                </div>
+              </div>
+
+              {notifications.length === 0 ? (
+                <p className="text-secondary mb-0">Brak powiadomień.</p>
+              ) : (
+                <div className="d-flex flex-column gap-3">
+                  {notifications.map((item) => (
+                    <article
+                      key={item.id}
+                      className={`card border ${item.read ? "" : "border-primary border-2"}`}
+                    >
+                      <div className="card-body">
+                        <div className="d-flex flex-column flex-md-row justify-content-between gap-2 mb-2">
+                          <div>
+                            <h3 className="h6 mb-1">{item.title}</h3>
+                            <p className="mb-1">{item.message}</p>
+                            <small className="text-secondary">
+                              {formatDate(item.createdAt)}
+                            </small>
+                          </div>
+
+                          <div className="d-flex align-items-start">
+                            <span className={`badge ${getNotificationBadgeClass(item.priority)}`}>
+                              {item.priority}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="d-flex flex-wrap gap-2 mt-2">
+                          {!item.read && (
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() => handleMarkNotificationRead(item.id)}
+                            >
+                              Oznacz jako przeczytane
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger"
+                            onClick={() => handleDeleteNotification(item.id)}
+                          >
+                            Usuń
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
         <section className="card card-custom shadow-sm mb-4">
           <div className="card-body">
             <h2 className="h4 mb-3">Użytkownicy (mock)</h2>
@@ -662,11 +917,32 @@ function App() {
               {users.map((user) => (
                 <div key={user.id} className="col-12 col-md-6 col-xl-4">
                   <article className="card h-100 card-custom border">
-                    <div className="card-body">
-                      <h3 className="h5 mb-2">
-                        {user.imie} {user.nazwisko}
-                      </h3>
-                      <p className="mb-0">Rola: {user.rola}</p>
+                    <div className="card-body d-flex align-items-center gap-3">
+                      <div
+                        style={{
+                          width: "54px",
+                          height: "54px",
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 700,
+                          color: "#fff",
+                          background: getUserAvatarGradient(user.rola),
+                          boxShadow: "0 8px 18px rgba(0,0,0,0.25)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {user.imie[0]}
+                        {user.nazwisko[0]}
+                      </div>
+
+                      <div>
+                        <h3 className="h5 mb-1">
+                          {user.imie} {user.nazwisko}
+                        </h3>
+                        <p className="mb-1">Rola: {user.rola}</p>
+                      </div>
                     </div>
                   </article>
                 </div>
@@ -704,7 +980,7 @@ function App() {
                 />
               </div>
 
-              <div className="d-flex flex-wrap gap-2">
+              <div className="d-flex flex-wrap gap-2 mt-2">
                 <button type="submit" className="btn btn-primary">
                   {editingProjectId ? "Zapisz projekt" : "Dodaj projekt"}
                 </button>
@@ -736,7 +1012,7 @@ function App() {
                         <h3 className="h5">{project.nazwa}</h3>
                         <p>{project.opis}</p>
 
-                        <div className="d-flex flex-wrap gap-2">
+                        <div className="d-flex flex-wrap gap-2 mt-2">
                           <button
                             type="button"
                             className="btn btn-primary"
@@ -839,7 +1115,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="d-flex flex-wrap gap-2">
+                  <div className="d-flex flex-wrap gap-2 mt-2">
                     <button type="submit" className="btn btn-primary">
                       {editingStoryId ? "Zapisz historyjkę" : "Dodaj historyjkę"}
                     </button>
@@ -863,7 +1139,11 @@ function App() {
                     <div className="col-12 col-lg-4">
                       <div className="card card-custom h-100 border">
                         <div className="card-body">
-                          <h3 className="h5 mb-3">Todo</h3>
+                          <h3 className="h5 mb-3 d-flex justify-content-between align-items-center">
+                            <span>Todo</span>
+                            <span className="badge text-bg-secondary">{todoStories.length}</span>
+                          </h3>
+
                           {todoStories.length === 0 ? (
                             <p className="text-secondary mb-0">Brak.</p>
                           ) : (
@@ -880,7 +1160,7 @@ function App() {
                                       Data: {formatDate(story.dataUtworzenia)}
                                     </small>
 
-                                    <div className="d-flex flex-wrap gap-2">
+                                    <div className="d-flex flex-wrap gap-2 mt-2">
                                       <button
                                         type="button"
                                         className="btn btn-sm btn-outline-secondary"
@@ -908,7 +1188,11 @@ function App() {
                     <div className="col-12 col-lg-4">
                       <div className="card card-custom h-100 border">
                         <div className="card-body">
-                          <h3 className="h5 mb-3">Doing</h3>
+                          <h3 className="h5 mb-3 d-flex justify-content-between align-items-center">
+                            <span>Doing</span>
+                            <span className="badge text-bg-secondary">{doingStories.length}</span>
+                          </h3>
+
                           {doingStories.length === 0 ? (
                             <p className="text-secondary mb-0">Brak.</p>
                           ) : (
@@ -925,7 +1209,7 @@ function App() {
                                       Data: {formatDate(story.dataUtworzenia)}
                                     </small>
 
-                                    <div className="d-flex flex-wrap gap-2">
+                                    <div className="d-flex flex-wrap gap-2 mt-2">
                                       <button
                                         type="button"
                                         className="btn btn-sm btn-outline-secondary"
@@ -953,7 +1237,11 @@ function App() {
                     <div className="col-12 col-lg-4">
                       <div className="card card-custom h-100 border">
                         <div className="card-body">
-                          <h3 className="h5 mb-3">Done</h3>
+                          <h3 className="h5 mb-3 d-flex justify-content-between align-items-center">
+                            <span>Done</span>
+                            <span className="badge text-bg-secondary">{doneStories.length}</span>
+                          </h3>
+
                           {doneStories.length === 0 ? (
                             <p className="text-secondary mb-0">Brak.</p>
                           ) : (
@@ -970,7 +1258,7 @@ function App() {
                                       Data: {formatDate(story.dataUtworzenia)}
                                     </small>
 
-                                    <div className="d-flex flex-wrap gap-2">
+                                    <div className="d-flex flex-wrap gap-2 mt-2">
                                       <button
                                         type="button"
                                         className="btn btn-sm btn-outline-secondary"
@@ -1100,7 +1388,7 @@ function App() {
                     </div>
                   </div>
 
-                  <div className="d-flex flex-wrap gap-2">
+                  <div className="d-flex flex-wrap gap-2 mt-2">
                     <button type="submit" className="btn btn-primary">
                       {editingTaskId ? "Zapisz zadanie" : "Dodaj zadanie"}
                     </button>
@@ -1121,7 +1409,11 @@ function App() {
                   <div className="col-12 col-lg-4">
                     <div className="card card-custom h-100 border">
                       <div className="card-body">
-                        <h3 className="h5 mb-3">Todo</h3>
+                        <h3 className="h5 mb-3 d-flex justify-content-between align-items-center">
+                          <span>Todo</span>
+                          <span className="badge text-bg-secondary">{todoTasks.length}</span>
+                        </h3>
+
                         {todoTasks.length === 0 ? (
                           <p className="text-secondary mb-0">Brak.</p>
                         ) : (
@@ -1149,7 +1441,7 @@ function App() {
                                     Osoba: {getUserName(task.uzytkownikId)}
                                   </small>
 
-                                  <div className="d-flex flex-wrap gap-2">
+                                  <div className="d-flex flex-wrap gap-2 mt-2">
                                     <button
                                       type="button"
                                       className="btn btn-sm btn-primary"
@@ -1184,7 +1476,11 @@ function App() {
                   <div className="col-12 col-lg-4">
                     <div className="card card-custom h-100 border">
                       <div className="card-body">
-                        <h3 className="h5 mb-3">Doing</h3>
+                        <h3 className="h5 mb-3 d-flex justify-content-between align-items-center">
+                          <span>Doing</span>
+                          <span className="badge text-bg-secondary">{doingTasks.length}</span>
+                        </h3>
+
                         {doingTasks.length === 0 ? (
                           <p className="text-secondary mb-0">Brak.</p>
                         ) : (
@@ -1212,7 +1508,7 @@ function App() {
                                     Osoba: {getUserName(task.uzytkownikId)}
                                   </small>
 
-                                  <div className="d-flex flex-wrap gap-2">
+                                  <div className="d-flex flex-wrap gap-2 mt-2">
                                     <button
                                       type="button"
                                       className="btn btn-sm btn-primary"
@@ -1247,7 +1543,11 @@ function App() {
                   <div className="col-12 col-lg-4">
                     <div className="card card-custom h-100 border">
                       <div className="card-body">
-                        <h3 className="h5 mb-3">Done</h3>
+                        <h3 className="h5 mb-3 d-flex justify-content-between align-items-center">
+                          <span>Done</span>
+                          <span className="badge text-bg-secondary">{doneTasks.length}</span>
+                        </h3>
+
                         {doneTasks.length === 0 ? (
                           <p className="text-secondary mb-0">Brak.</p>
                         ) : (
@@ -1275,7 +1575,7 @@ function App() {
                                     Osoba: {getUserName(task.uzytkownikId)}
                                   </small>
 
-                                  <div className="d-flex flex-wrap gap-2">
+                                  <div className="d-flex flex-wrap gap-2 mt-2">
                                     <button
                                       type="button"
                                       className="btn btn-sm btn-primary"
@@ -1433,6 +1733,55 @@ function App() {
             )}
           </div>
         </section>
+
+        {popupNotification && (
+          <div
+            className="position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center"
+            style={{
+              backgroundColor: "rgba(0,0,0,0.45)",
+              zIndex: 1050,
+            }}
+          >
+            <div className="card shadow" style={{ width: "100%", maxWidth: "520px" }}>
+              <div className="card-body">
+                <div className="d-flex justify-content-between align-items-start mb-3">
+                  <div>
+                    <h3 className="h5 mb-1">{popupNotification.title}</h3>
+                    <span
+                      className={`badge ${getNotificationBadgeClass(
+                        popupNotification.priority
+                      )}`}
+                    >
+                      {popupNotification.priority}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn-close"
+                    aria-label="Close"
+                    onClick={handleClosePopup}
+                  />
+                </div>
+
+                <p>{popupNotification.message}</p>
+                <small className="text-secondary d-block mb-3">
+                  {formatDate(popupNotification.createdAt)}
+                </small>
+
+                <div className="d-flex justify-content-end">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleClosePopup}
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
