@@ -47,6 +47,29 @@ const getEmptyTaskForm = (historyjkaId = ""): TaskFormState => ({
 });
 
 function App() {
+  const getInitialTheme = (): "light" | "dark" => {
+    const savedTheme = localStorage.getItem("theme");
+
+    if (savedTheme === "light" || savedTheme === "dark") {
+      return savedTheme;
+    }
+
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  };
+
+  const [theme, setTheme] = useState<"light" | "dark">(getInitialTheme);
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "light" ? "dark" : "light"));
+  };
+
   const [currentUser] = useState<User>(() => currentUserApi.getCurrentUser());
   const [users, setUsers] = useState<User[]>([]);
 
@@ -109,15 +132,11 @@ function App() {
     setStories(projectStories);
 
     const storyIds = projectStories.map((story) => story.id);
-    const projectTasks =
-      storyIds.length > 0 ? tasksApi.getByStoryIds(storyIds) : [];
+    const projectTasks = storyIds.length > 0 ? tasksApi.getByStoryIds(storyIds) : [];
 
     setTasks(projectTasks);
 
-    if (
-      selectedTaskId &&
-      !projectTasks.some((task) => task.id === selectedTaskId)
-    ) {
+    if (selectedTaskId && !projectTasks.some((task) => task.id === selectedTaskId)) {
       setSelectedTaskId(null);
     }
   };
@@ -136,10 +155,7 @@ function App() {
   useEffect(() => {
     if (!isProjectsLoaded) return;
 
-    if (
-      activeProjectId &&
-      !projects.some((project) => project.id === activeProjectId)
-    ) {
+    if (activeProjectId && !projects.some((project) => project.id === activeProjectId)) {
       projectsApi.setActiveProjectId(null);
       setActiveProjectId(null);
     }
@@ -607,667 +623,815 @@ function App() {
   const doneTasks = tasks.filter((task) => task.stan === "done");
 
   return (
-    <div className="app">
+    <div className="app-shell py-4">
       <div className="container">
-        <header className="topbar">
-          <div>
-            <h1>ManageMe</h1>
-            <p className="subtitle">
-              Zalogowany użytkownik:{" "}
-              <strong>
-                {currentUser.imie} {currentUser.nazwisko}
-              </strong>{" "}
-              ({currentUser.rola})
-            </p>
-          </div>
+        <header className="card card-custom shadow-sm mb-4">
+          <div className="card-body d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
+            <div>
+              <h1 className="h2 mb-1">ManageMe</h1>
+              <p className="mb-0 text-secondary">
+                Zalogowany użytkownik:{" "}
+                <strong>
+                  {currentUser.imie} {currentUser.nazwisko}
+                </strong>{" "}
+                ({currentUser.rola})
+              </p>
+            </div>
 
-          <div className="active-box">
-            <span>Aktywny projekt:</span>
-            <strong>{activeProject ? activeProject.nazwa : "brak"}</strong>
+            <div className="d-flex flex-column flex-sm-row gap-2 align-items-sm-center">
+              <div className="badge text-bg-primary fs-6 p-2">
+                Aktywny projekt: {activeProject ? activeProject.nazwa : "brak"}
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-outline-primary"
+                onClick={toggleTheme}
+              >
+                {theme === "light" ? "🌙 Tryb ciemny" : "☀️ Tryb jasny"}
+              </button>
+            </div>
           </div>
         </header>
 
-        <section className="panel">
-          <h2>Użytkownicy (mock)</h2>
+        <section className="card card-custom shadow-sm mb-4">
+          <div className="card-body">
+            <h2 className="h4 mb-3">Użytkownicy (mock)</h2>
 
-          <div className="user-grid">
-            {users.map((user) => (
-              <article key={user.id} className="user-card">
-                <h3>
-                  {user.imie} {user.nazwisko}
-                </h3>
-                <p>Rola: {user.rola}</p>
-              </article>
-            ))}
+            <div className="row g-3">
+              {users.map((user) => (
+                <div key={user.id} className="col-12 col-md-6 col-xl-4">
+                  <article className="card h-100 card-custom border">
+                    <div className="card-body">
+                      <h3 className="h5 mb-2">
+                        {user.imie} {user.nazwisko}
+                      </h3>
+                      <p className="mb-0">Rola: {user.rola}</p>
+                    </div>
+                  </article>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="panel">
-          <h2>Projekty</h2>
+        <section className="card card-custom shadow-sm mb-4">
+          <div className="card-body">
+            <h2 className="h4 mb-3">Projekty</h2>
 
-          <form className="form" onSubmit={handleProjectSubmit}>
-            <label>
-              Nazwa projektu
-              <input
-                type="text"
-                name="nazwa"
-                value={projectForm.nazwa}
-                onChange={handleProjectChange}
-                placeholder="Np. System rezerwacji"
-              />
-            </label>
+            <form onSubmit={handleProjectSubmit} className="mb-4">
+              <div className="mb-3">
+                <label className="form-label">Nazwa projektu</label>
+                <input
+                  type="text"
+                  name="nazwa"
+                  value={projectForm.nazwa}
+                  onChange={handleProjectChange}
+                  placeholder="Np. System rezerwacji"
+                  className="form-control"
+                />
+              </div>
 
-            <label>
-              Opis projektu
-              <textarea
-                name="opis"
-                value={projectForm.opis}
-                onChange={handleProjectChange}
-                placeholder="Krótki opis projektu"
-                rows={3}
-              />
-            </label>
+              <div className="mb-3">
+                <label className="form-label">Opis projektu</label>
+                <textarea
+                  name="opis"
+                  value={projectForm.opis}
+                  onChange={handleProjectChange}
+                  placeholder="Krótki opis projektu"
+                  rows={3}
+                  className="form-control"
+                />
+              </div>
 
-            <div className="actions">
-              <button type="submit">
-                {editingProjectId ? "Zapisz projekt" : "Dodaj projekt"}
-              </button>
-
-              {editingProjectId && (
-                <button
-                  type="button"
-                  className="secondary"
-                  onClick={resetProjectForm}
-                >
-                  Anuluj edycję
+              <div className="d-flex flex-wrap gap-2">
+                <button type="submit" className="btn btn-primary">
+                  {editingProjectId ? "Zapisz projekt" : "Dodaj projekt"}
                 </button>
+
+                {editingProjectId && (
+                  <button
+                    type="button"
+                    className="btn btn-outline-secondary"
+                    onClick={resetProjectForm}
+                  >
+                    Anuluj edycję
+                  </button>
+                )}
+              </div>
+            </form>
+
+            <div className="row g-3">
+              {projects.length === 0 ? (
+                <p className="text-secondary mb-0">Brak projektów.</p>
+              ) : (
+                projects.map((project) => (
+                  <div key={project.id} className="col-12 col-lg-6">
+                    <article
+                      className={`card h-100 card-custom border ${
+                        activeProjectId === project.id ? "border-primary border-2" : ""
+                      }`}
+                    >
+                      <div className="card-body">
+                        <h3 className="h5">{project.nazwa}</h3>
+                        <p>{project.opis}</p>
+
+                        <div className="d-flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => handleSelectProject(project.id)}
+                          >
+                            {activeProjectId === project.id
+                              ? "Aktywny"
+                              : "Ustaw jako aktywny"}
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary"
+                            onClick={() => handleEditProject(project)}
+                          >
+                            Edytuj
+                          </button>
+
+                          <button
+                            type="button"
+                            className="btn btn-outline-danger"
+                            onClick={() => handleDeleteProject(project.id)}
+                          >
+                            Usuń
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  </div>
+                ))
               )}
             </div>
-          </form>
+          </div>
+        </section>
 
-          <div className="cards">
-            {projects.length === 0 ? (
-              <p className="empty">Brak projektów.</p>
+        <section className="card card-custom shadow-sm mb-4">
+          <div className="card-body">
+            <h2 className="h4 mb-3">Historyjki</h2>
+
+            {!activeProject ? (
+              <p className="text-secondary mb-0">Najpierw ustaw aktywny projekt.</p>
             ) : (
-              projects.map((project) => (
-                <article
-                  key={project.id}
-                  className={`card ${activeProjectId === project.id ? "card-active" : ""}`}
-                >
-                  <h3>{project.nazwa}</h3>
-                  <p>{project.opis}</p>
+              <>
+                <p className="text-secondary">
+                  Pracujesz na projekcie: <strong>{activeProject.nazwa}</strong>
+                </p>
 
-                  <div className="actions">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectProject(project.id)}
-                    >
-                      {activeProjectId === project.id
-                        ? "Aktywny"
-                        : "Ustaw jako aktywny"}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={() => handleEditProject(project)}
-                    >
-                      Edytuj
-                    </button>
-
-                    <button
-                      type="button"
-                      className="danger"
-                      onClick={() => handleDeleteProject(project.id)}
-                    >
-                      Usuń
-                    </button>
+                <form onSubmit={handleStorySubmit} className="mb-4">
+                  <div className="mb-3">
+                    <label className="form-label">Nazwa historyjki</label>
+                    <input
+                      type="text"
+                      name="nazwa"
+                      value={storyForm.nazwa}
+                      onChange={handleStoryChange}
+                      placeholder="Np. Logowanie użytkownika"
+                      className="form-control"
+                    />
                   </div>
-                </article>
-              ))
+
+                  <div className="mb-3">
+                    <label className="form-label">Opis historyjki</label>
+                    <textarea
+                      name="opis"
+                      value={storyForm.opis}
+                      onChange={handleStoryChange}
+                      placeholder="Opis funkcjonalności"
+                      rows={3}
+                      className="form-control"
+                    />
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-12 col-md-6">
+                      <label className="form-label">Priorytet</label>
+                      <select
+                        name="priorytet"
+                        value={storyForm.priorytet}
+                        onChange={handleStoryChange}
+                        className="form-select"
+                      >
+                        <option value="niski">niski</option>
+                        <option value="średni">średni</option>
+                        <option value="wysoki">wysoki</option>
+                      </select>
+                    </div>
+
+                    <div className="col-12 col-md-6">
+                      <label className="form-label">Stan</label>
+                      <select
+                        name="stan"
+                        value={storyForm.stan}
+                        onChange={handleStoryChange}
+                        className="form-select"
+                      >
+                        <option value="todo">todo</option>
+                        <option value="doing">doing</option>
+                        <option value="done">done</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="d-flex flex-wrap gap-2">
+                    <button type="submit" className="btn btn-primary">
+                      {editingStoryId ? "Zapisz historyjkę" : "Dodaj historyjkę"}
+                    </button>
+
+                    {editingStoryId && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={resetStoryForm}
+                      >
+                        Anuluj edycję
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                {stories.length === 0 ? (
+                  <p className="text-secondary mb-0">Brak historyjek.</p>
+                ) : (
+                  <div className="row g-3">
+                    <div className="col-12 col-lg-4">
+                      <div className="card card-custom h-100 border">
+                        <div className="card-body">
+                          <h3 className="h5 mb-3">Todo</h3>
+                          {todoStories.length === 0 ? (
+                            <p className="text-secondary mb-0">Brak.</p>
+                          ) : (
+                            <div className="d-flex flex-column gap-3">
+                              {todoStories.map((story) => (
+                                <article key={story.id} className="card border">
+                                  <div className="card-body">
+                                    <h4 className="h6">{story.nazwa}</h4>
+                                    <p>{story.opis}</p>
+                                    <small className="d-block">
+                                      Priorytet: {story.priorytet}
+                                    </small>
+                                    <small className="d-block mb-2">
+                                      Data: {formatDate(story.dataUtworzenia)}
+                                    </small>
+
+                                    <div className="d-flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary"
+                                        onClick={() => handleEditStory(story)}
+                                      >
+                                        Edytuj
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-danger"
+                                        onClick={() => handleDeleteStory(story.id)}
+                                      >
+                                        Usuń
+                                      </button>
+                                    </div>
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="col-12 col-lg-4">
+                      <div className="card card-custom h-100 border">
+                        <div className="card-body">
+                          <h3 className="h5 mb-3">Doing</h3>
+                          {doingStories.length === 0 ? (
+                            <p className="text-secondary mb-0">Brak.</p>
+                          ) : (
+                            <div className="d-flex flex-column gap-3">
+                              {doingStories.map((story) => (
+                                <article key={story.id} className="card border">
+                                  <div className="card-body">
+                                    <h4 className="h6">{story.nazwa}</h4>
+                                    <p>{story.opis}</p>
+                                    <small className="d-block">
+                                      Priorytet: {story.priorytet}
+                                    </small>
+                                    <small className="d-block mb-2">
+                                      Data: {formatDate(story.dataUtworzenia)}
+                                    </small>
+
+                                    <div className="d-flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary"
+                                        onClick={() => handleEditStory(story)}
+                                      >
+                                        Edytuj
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-danger"
+                                        onClick={() => handleDeleteStory(story.id)}
+                                      >
+                                        Usuń
+                                      </button>
+                                    </div>
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="col-12 col-lg-4">
+                      <div className="card card-custom h-100 border">
+                        <div className="card-body">
+                          <h3 className="h5 mb-3">Done</h3>
+                          {doneStories.length === 0 ? (
+                            <p className="text-secondary mb-0">Brak.</p>
+                          ) : (
+                            <div className="d-flex flex-column gap-3">
+                              {doneStories.map((story) => (
+                                <article key={story.id} className="card border">
+                                  <div className="card-body">
+                                    <h4 className="h6">{story.nazwa}</h4>
+                                    <p>{story.opis}</p>
+                                    <small className="d-block">
+                                      Priorytet: {story.priorytet}
+                                    </small>
+                                    <small className="d-block mb-2">
+                                      Data: {formatDate(story.dataUtworzenia)}
+                                    </small>
+
+                                    <div className="d-flex flex-wrap gap-2">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary"
+                                        onClick={() => handleEditStory(story)}
+                                      >
+                                        Edytuj
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-danger"
+                                        onClick={() => handleDeleteStory(story.id)}
+                                      >
+                                        Usuń
+                                      </button>
+                                    </div>
+                                  </div>
+                                </article>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </section>
 
-        <section className="panel">
-          <h2>Historyjki</h2>
+        <section className="card card-custom shadow-sm mb-4">
+          <div className="card-body">
+            <h2 className="h4 mb-3">Zadania</h2>
 
-          {!activeProject ? (
-            <p className="empty">Najpierw ustaw aktywny projekt.</p>
-          ) : (
-            <>
-              <p className="subtitle">
-                Pracujesz na projekcie: <strong>{activeProject.nazwa}</strong>
+            {!activeProject ? (
+              <p className="text-secondary mb-0">Najpierw ustaw aktywny projekt.</p>
+            ) : stories.length === 0 ? (
+              <p className="text-secondary mb-0">
+                Najpierw dodaj historyjkę do aktywnego projektu.
               </p>
-
-              <form className="form" onSubmit={handleStorySubmit}>
-                <label>
-                  Nazwa historyjki
-                  <input
-                    type="text"
-                    name="nazwa"
-                    value={storyForm.nazwa}
-                    onChange={handleStoryChange}
-                    placeholder="Np. Logowanie użytkownika"
-                  />
-                </label>
-
-                <label>
-                  Opis historyjki
-                  <textarea
-                    name="opis"
-                    value={storyForm.opis}
-                    onChange={handleStoryChange}
-                    placeholder="Opis funkcjonalności"
-                    rows={3}
-                  />
-                </label>
-
-                <div className="grid-2">
-                  <label>
-                    Priorytet
-                    <select
-                      name="priorytet"
-                      value={storyForm.priorytet}
-                      onChange={handleStoryChange}
-                    >
-                      <option value="niski">niski</option>
-                      <option value="średni">średni</option>
-                      <option value="wysoki">wysoki</option>
-                    </select>
-                  </label>
-
-                  <label>
-                    Stan
-                    <select
-                      name="stan"
-                      value={storyForm.stan}
-                      onChange={handleStoryChange}
-                    >
-                      <option value="todo">todo</option>
-                      <option value="doing">doing</option>
-                      <option value="done">done</option>
-                    </select>
-                  </label>
-                </div>
-
-                <div className="actions">
-                  <button type="submit">
-                    {editingStoryId ? "Zapisz historyjkę" : "Dodaj historyjkę"}
-                  </button>
-
-                  {editingStoryId && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={resetStoryForm}
-                    >
-                      Anuluj edycję
-                    </button>
-                  )}
-                </div>
-              </form>
-
-              {stories.length === 0 ? (
-                <p className="empty">Brak historyjek.</p>
-              ) : (
-                <div className="kanban-columns">
-                  <div className="kanban-column">
-                    <h3>Todo</h3>
-                    {todoStories.length === 0 ? (
-                      <p className="empty">Brak.</p>
-                    ) : (
-                      todoStories.map((story) => (
-                        <article key={story.id} className="kanban-card">
-                          <h4>{story.nazwa}</h4>
-                          <p>{story.opis}</p>
-                          <small>Priorytet: {story.priorytet}</small>
-                          <small>Data: {formatDate(story.dataUtworzenia)}</small>
-
-                          <div className="actions">
-                            <button
-                              type="button"
-                              className="secondary"
-                              onClick={() => handleEditStory(story)}
-                            >
-                              Edytuj
-                            </button>
-                            <button
-                              type="button"
-                              className="danger"
-                              onClick={() => handleDeleteStory(story.id)}
-                            >
-                              Usuń
-                            </button>
-                          </div>
-                        </article>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="kanban-column">
-                    <h3>Doing</h3>
-                    {doingStories.length === 0 ? (
-                      <p className="empty">Brak.</p>
-                    ) : (
-                      doingStories.map((story) => (
-                        <article key={story.id} className="kanban-card">
-                          <h4>{story.nazwa}</h4>
-                          <p>{story.opis}</p>
-                          <small>Priorytet: {story.priorytet}</small>
-                          <small>Data: {formatDate(story.dataUtworzenia)}</small>
-
-                          <div className="actions">
-                            <button
-                              type="button"
-                              className="secondary"
-                              onClick={() => handleEditStory(story)}
-                            >
-                              Edytuj
-                            </button>
-                            <button
-                              type="button"
-                              className="danger"
-                              onClick={() => handleDeleteStory(story.id)}
-                            >
-                              Usuń
-                            </button>
-                          </div>
-                        </article>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="kanban-column">
-                    <h3>Done</h3>
-                    {doneStories.length === 0 ? (
-                      <p className="empty">Brak.</p>
-                    ) : (
-                      doneStories.map((story) => (
-                        <article key={story.id} className="kanban-card">
-                          <h4>{story.nazwa}</h4>
-                          <p>{story.opis}</p>
-                          <small>Priorytet: {story.priorytet}</small>
-                          <small>Data: {formatDate(story.dataUtworzenia)}</small>
-
-                          <div className="actions">
-                            <button
-                              type="button"
-                              className="secondary"
-                              onClick={() => handleEditStory(story)}
-                            >
-                              Edytuj
-                            </button>
-                            <button
-                              type="button"
-                              className="danger"
-                              onClick={() => handleDeleteStory(story.id)}
-                            >
-                              Usuń
-                            </button>
-                          </div>
-                        </article>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </>
-          )}
-        </section>
-
-        <section className="panel">
-          <h2>Zadania</h2>
-
-          {!activeProject ? (
-            <p className="empty">Najpierw ustaw aktywny projekt.</p>
-          ) : stories.length === 0 ? (
-            <p className="empty">Najpierw dodaj historyjkę do aktywnego projektu.</p>
-          ) : (
-            <>
-              <form className="form" onSubmit={handleTaskSubmit}>
-                <label>
-                  Nazwa zadania
-                  <input
-                    type="text"
-                    name="nazwa"
-                    value={taskForm.nazwa}
-                    onChange={handleTaskChange}
-                    placeholder="Np. Konfiguracja bazy danych"
-                  />
-                </label>
-
-                <label>
-                  Opis zadania
-                  <textarea
-                    name="opis"
-                    value={taskForm.opis}
-                    onChange={handleTaskChange}
-                    placeholder="Opis zadania"
-                    rows={3}
-                  />
-                </label>
-
-                <div className="grid-2">
-                  <label>
-                    Priorytet
-                    <select
-                      name="priorytet"
-                      value={taskForm.priorytet}
-                      onChange={handleTaskChange}
-                    >
-                      <option value="niski">niski</option>
-                      <option value="średni">średni</option>
-                      <option value="wysoki">wysoki</option>
-                    </select>
-                  </label>
-
-                  <label>
-                    Historyjka
-                    <select
-                      name="historyjkaId"
-                      value={taskForm.historyjkaId}
-                      onChange={handleTaskChange}
-                    >
-                      {stories.map((story) => (
-                        <option key={story.id} value={story.id}>
-                          {story.nazwa}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-
-                <div className="grid-2">
-                  <label>
-                    Przewidywany czas wykonania
+            ) : (
+              <>
+                <form onSubmit={handleTaskSubmit} className="mb-4">
+                  <div className="mb-3">
+                    <label className="form-label">Nazwa zadania</label>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      name="przewidywanyCzas"
-                      value={taskForm.przewidywanyCzas}
+                      type="text"
+                      name="nazwa"
+                      value={taskForm.nazwa}
                       onChange={handleTaskChange}
-                      placeholder="Np. 8"
+                      placeholder="Np. Konfiguracja bazy danych"
+                      className="form-control"
                     />
-                  </label>
-
-                  <label>
-                    Zrealizowane roboczogodziny
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.5"
-                      name="zrealizowaneRoboczogodziny"
-                      value={taskForm.zrealizowaneRoboczogodziny}
-                      onChange={handleTaskChange}
-                      placeholder="Np. 2"
-                    />
-                  </label>
-                </div>
-
-                <div className="actions">
-                  <button type="submit">
-                    {editingTaskId ? "Zapisz zadanie" : "Dodaj zadanie"}
-                  </button>
-
-                  {editingTaskId && (
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={resetTaskForm}
-                    >
-                      Anuluj edycję
-                    </button>
-                  )}
-                </div>
-              </form>
-
-              <div className="kanban-columns">
-                <div className="kanban-column">
-                  <h3>Todo</h3>
-                  {todoTasks.length === 0 ? (
-                    <p className="empty">Brak.</p>
-                  ) : (
-                    todoTasks.map((task) => (
-                      <article
-                        key={task.id}
-                        className={`kanban-card ${selectedTaskId === task.id ? "selected-card" : ""}`}
-                      >
-                        <h4>{task.nazwa}</h4>
-                        <p>{task.opis}</p>
-                        <small>Historyjka: {getStoryName(task.historyjkaId)}</small>
-                        <small>Priorytet: {task.priorytet}</small>
-                        <small>Plan: {task.przewidywanyCzas} h</small>
-                        <small>Osoba: {getUserName(task.uzytkownikId)}</small>
-
-                        <div className="actions">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedTaskId(task.id)}
-                          >
-                            Szczegóły
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => handleEditTask(task)}
-                          >
-                            Edytuj
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => handleDeleteTask(task.id)}
-                          >
-                            Usuń
-                          </button>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-
-                <div className="kanban-column">
-                  <h3>Doing</h3>
-                  {doingTasks.length === 0 ? (
-                    <p className="empty">Brak.</p>
-                  ) : (
-                    doingTasks.map((task) => (
-                      <article
-                        key={task.id}
-                        className={`kanban-card ${selectedTaskId === task.id ? "selected-card" : ""}`}
-                      >
-                        <h4>{task.nazwa}</h4>
-                        <p>{task.opis}</p>
-                        <small>Historyjka: {getStoryName(task.historyjkaId)}</small>
-                        <small>Priorytet: {task.priorytet}</small>
-                        <small>Plan: {task.przewidywanyCzas} h</small>
-                        <small>Osoba: {getUserName(task.uzytkownikId)}</small>
-
-                        <div className="actions">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedTaskId(task.id)}
-                          >
-                            Szczegóły
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => handleEditTask(task)}
-                          >
-                            Edytuj
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => handleDeleteTask(task.id)}
-                          >
-                            Usuń
-                          </button>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-
-                <div className="kanban-column">
-                  <h3>Done</h3>
-                  {doneTasks.length === 0 ? (
-                    <p className="empty">Brak.</p>
-                  ) : (
-                    doneTasks.map((task) => (
-                      <article
-                        key={task.id}
-                        className={`kanban-card ${selectedTaskId === task.id ? "selected-card" : ""}`}
-                      >
-                        <h4>{task.nazwa}</h4>
-                        <p>{task.opis}</p>
-                        <small>Historyjka: {getStoryName(task.historyjkaId)}</small>
-                        <small>Priorytet: {task.priorytet}</small>
-                        <small>Plan: {task.przewidywanyCzas} h</small>
-                        <small>Osoba: {getUserName(task.uzytkownikId)}</small>
-
-                        <div className="actions">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedTaskId(task.id)}
-                          >
-                            Szczegóły
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary"
-                            onClick={() => handleEditTask(task)}
-                          >
-                            Edytuj
-                          </button>
-                          <button
-                            type="button"
-                            className="danger"
-                            onClick={() => handleDeleteTask(task.id)}
-                          >
-                            Usuń
-                          </button>
-                        </div>
-                      </article>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {selectedTask && (
-                <section className="detail-panel">
-                  <h3>Szczegóły zadania</h3>
-
-                  <div className="detail-grid">
-                    <div>
-                      <strong>Nazwa:</strong>
-                      <p>{selectedTask.nazwa}</p>
-                    </div>
-
-                    <div>
-                      <strong>Historyjka:</strong>
-                      <p>{getStoryName(selectedTask.historyjkaId)}</p>
-                    </div>
-
-                    <div>
-                      <strong>Opis:</strong>
-                      <p>{selectedTask.opis}</p>
-                    </div>
-
-                    <div>
-                      <strong>Priorytet:</strong>
-                      <p>{selectedTask.priorytet}</p>
-                    </div>
-
-                    <div>
-                      <strong>Stan:</strong>
-                      <p>{selectedTask.stan}</p>
-                    </div>
-
-                    <div>
-                      <strong>Data dodania:</strong>
-                      <p>{formatDate(selectedTask.dataDodania)}</p>
-                    </div>
-
-                    <div>
-                      <strong>Data startu:</strong>
-                      <p>{formatDate(selectedTask.dataStartu)}</p>
-                    </div>
-
-                    <div>
-                      <strong>Data zakończenia:</strong>
-                      <p>{formatDate(selectedTask.dataZakonczenia)}</p>
-                    </div>
-
-                    <div>
-                      <strong>Przewidywany czas:</strong>
-                      <p>{selectedTask.przewidywanyCzas} h</p>
-                    </div>
-
-                    <div>
-                      <strong>Przypisana osoba:</strong>
-                      <p>{getUserName(selectedTask.uzytkownikId)}</p>
-                    </div>
                   </div>
 
-                  <div className="detail-actions-block">
-                    <label>
-                      Przypisz osobę
+                  <div className="mb-3">
+                    <label className="form-label">Opis zadania</label>
+                    <textarea
+                      name="opis"
+                      value={taskForm.opis}
+                      onChange={handleTaskChange}
+                      placeholder="Opis zadania"
+                      rows={3}
+                      className="form-control"
+                    />
+                  </div>
+
+                  <div className="row g-3 mb-3">
+                    <div className="col-12 col-md-6">
+                      <label className="form-label">Priorytet</label>
                       <select
-                        value={detailAssigneeId}
-                        onChange={(e) => setDetailAssigneeId(e.target.value)}
+                        name="priorytet"
+                        value={taskForm.priorytet}
+                        onChange={handleTaskChange}
+                        className="form-select"
                       >
-                        <option value="">-- wybierz --</option>
-                        {assignableUsers.map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.imie} {user.nazwisko} ({user.rola})
+                        <option value="niski">niski</option>
+                        <option value="średni">średni</option>
+                        <option value="wysoki">wysoki</option>
+                      </select>
+                    </div>
+
+                    <div className="col-12 col-md-6">
+                      <label className="form-label">Historyjka</label>
+                      <select
+                        name="historyjkaId"
+                        value={taskForm.historyjkaId}
+                        onChange={handleTaskChange}
+                        className="form-select"
+                      >
+                        {stories.map((story) => (
+                          <option key={story.id} value={story.id}>
+                            {story.nazwa}
                           </option>
                         ))}
                       </select>
-                    </label>
-
-                    <button type="button" onClick={handleAssignUser}>
-                      Przypisz i ustaw doing
-                    </button>
+                    </div>
                   </div>
 
-                  <div className="detail-actions-block">
-                    <label>
-                      Zrealizowane roboczogodziny
+                  <div className="row g-3 mb-3">
+                    <div className="col-12 col-md-6">
+                      <label className="form-label">Przewidywany czas wykonania</label>
                       <input
                         type="number"
                         min="0"
                         step="0.5"
-                        value={detailHours}
-                        onChange={(e) => setDetailHours(e.target.value)}
+                        name="przewidywanyCzas"
+                        value={taskForm.przewidywanyCzas}
+                        onChange={handleTaskChange}
+                        placeholder="Np. 8"
+                        className="form-control"
                       />
-                    </label>
+                    </div>
 
-                    <button
-                      type="button"
-                      className="secondary"
-                      onClick={handleSaveDetailHours}
-                    >
-                      Zapisz roboczogodziny
-                    </button>
+                    <div className="col-12 col-md-6">
+                      <label className="form-label">Zrealizowane roboczogodziny</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.5"
+                        name="zrealizowaneRoboczogodziny"
+                        value={taskForm.zrealizowaneRoboczogodziny}
+                        onChange={handleTaskChange}
+                        placeholder="Np. 2"
+                        className="form-control"
+                      />
+                    </div>
                   </div>
 
-                  <div className="actions">
-                    <button
-                      type="button"
-                      className="success"
-                      onClick={handleMarkTaskDone}
-                    >
-                      Oznacz jako done
+                  <div className="d-flex flex-wrap gap-2">
+                    <button type="submit" className="btn btn-primary">
+                      {editingTaskId ? "Zapisz zadanie" : "Dodaj zadanie"}
                     </button>
+
+                    {editingTaskId && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-secondary"
+                        onClick={resetTaskForm}
+                      >
+                        Anuluj edycję
+                      </button>
+                    )}
                   </div>
-                </section>
-              )}
-            </>
-          )}
+                </form>
+
+                <div className="row g-3 mb-4">
+                  <div className="col-12 col-lg-4">
+                    <div className="card card-custom h-100 border">
+                      <div className="card-body">
+                        <h3 className="h5 mb-3">Todo</h3>
+                        {todoTasks.length === 0 ? (
+                          <p className="text-secondary mb-0">Brak.</p>
+                        ) : (
+                          <div className="d-flex flex-column gap-3">
+                            {todoTasks.map((task) => (
+                              <article
+                                key={task.id}
+                                className={`card border ${
+                                  selectedTaskId === task.id ? "border-primary border-2" : ""
+                                }`}
+                              >
+                                <div className="card-body">
+                                  <h4 className="h6">{task.nazwa}</h4>
+                                  <p>{task.opis}</p>
+                                  <small className="d-block">
+                                    Historyjka: {getStoryName(task.historyjkaId)}
+                                  </small>
+                                  <small className="d-block">
+                                    Priorytet: {task.priorytet}
+                                  </small>
+                                  <small className="d-block">
+                                    Plan: {task.przewidywanyCzas} h
+                                  </small>
+                                  <small className="d-block mb-2">
+                                    Osoba: {getUserName(task.uzytkownikId)}
+                                  </small>
+
+                                  <div className="d-flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-primary"
+                                      onClick={() => setSelectedTaskId(task.id)}
+                                    >
+                                      Szczegóły
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-secondary"
+                                      onClick={() => handleEditTask(task)}
+                                    >
+                                      Edytuj
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-danger"
+                                      onClick={() => handleDeleteTask(task.id)}
+                                    >
+                                      Usuń
+                                    </button>
+                                  </div>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-lg-4">
+                    <div className="card card-custom h-100 border">
+                      <div className="card-body">
+                        <h3 className="h5 mb-3">Doing</h3>
+                        {doingTasks.length === 0 ? (
+                          <p className="text-secondary mb-0">Brak.</p>
+                        ) : (
+                          <div className="d-flex flex-column gap-3">
+                            {doingTasks.map((task) => (
+                              <article
+                                key={task.id}
+                                className={`card border ${
+                                  selectedTaskId === task.id ? "border-primary border-2" : ""
+                                }`}
+                              >
+                                <div className="card-body">
+                                  <h4 className="h6">{task.nazwa}</h4>
+                                  <p>{task.opis}</p>
+                                  <small className="d-block">
+                                    Historyjka: {getStoryName(task.historyjkaId)}
+                                  </small>
+                                  <small className="d-block">
+                                    Priorytet: {task.priorytet}
+                                  </small>
+                                  <small className="d-block">
+                                    Plan: {task.przewidywanyCzas} h
+                                  </small>
+                                  <small className="d-block mb-2">
+                                    Osoba: {getUserName(task.uzytkownikId)}
+                                  </small>
+
+                                  <div className="d-flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-primary"
+                                      onClick={() => setSelectedTaskId(task.id)}
+                                    >
+                                      Szczegóły
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-secondary"
+                                      onClick={() => handleEditTask(task)}
+                                    >
+                                      Edytuj
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-danger"
+                                      onClick={() => handleDeleteTask(task.id)}
+                                    >
+                                      Usuń
+                                    </button>
+                                  </div>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-lg-4">
+                    <div className="card card-custom h-100 border">
+                      <div className="card-body">
+                        <h3 className="h5 mb-3">Done</h3>
+                        {doneTasks.length === 0 ? (
+                          <p className="text-secondary mb-0">Brak.</p>
+                        ) : (
+                          <div className="d-flex flex-column gap-3">
+                            {doneTasks.map((task) => (
+                              <article
+                                key={task.id}
+                                className={`card border ${
+                                  selectedTaskId === task.id ? "border-primary border-2" : ""
+                                }`}
+                              >
+                                <div className="card-body">
+                                  <h4 className="h6">{task.nazwa}</h4>
+                                  <p>{task.opis}</p>
+                                  <small className="d-block">
+                                    Historyjka: {getStoryName(task.historyjkaId)}
+                                  </small>
+                                  <small className="d-block">
+                                    Priorytet: {task.priorytet}
+                                  </small>
+                                  <small className="d-block">
+                                    Plan: {task.przewidywanyCzas} h
+                                  </small>
+                                  <small className="d-block mb-2">
+                                    Osoba: {getUserName(task.uzytkownikId)}
+                                  </small>
+
+                                  <div className="d-flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-primary"
+                                      onClick={() => setSelectedTaskId(task.id)}
+                                    >
+                                      Szczegóły
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-secondary"
+                                      onClick={() => handleEditTask(task)}
+                                    >
+                                      Edytuj
+                                    </button>
+                                    <button
+                                      type="button"
+                                      className="btn btn-sm btn-outline-danger"
+                                      onClick={() => handleDeleteTask(task.id)}
+                                    >
+                                      Usuń
+                                    </button>
+                                  </div>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedTask && (
+                  <section className="card card-custom border">
+                    <div className="card-body">
+                      <h3 className="h5 mb-3">Szczegóły zadania</h3>
+
+                      <div className="row g-3 mb-4">
+                        <div className="col-12 col-md-6">
+                          <strong>Nazwa:</strong>
+                          <p className="mb-0">{selectedTask.nazwa}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Historyjka:</strong>
+                          <p className="mb-0">{getStoryName(selectedTask.historyjkaId)}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Opis:</strong>
+                          <p className="mb-0">{selectedTask.opis}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Priorytet:</strong>
+                          <p className="mb-0">{selectedTask.priorytet}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Stan:</strong>
+                          <p className="mb-0">{selectedTask.stan}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Data dodania:</strong>
+                          <p className="mb-0">{formatDate(selectedTask.dataDodania)}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Data startu:</strong>
+                          <p className="mb-0">{formatDate(selectedTask.dataStartu)}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Data zakończenia:</strong>
+                          <p className="mb-0">{formatDate(selectedTask.dataZakonczenia)}</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Przewidywany czas:</strong>
+                          <p className="mb-0">{selectedTask.przewidywanyCzas} h</p>
+                        </div>
+
+                        <div className="col-12 col-md-6">
+                          <strong>Przypisana osoba:</strong>
+                          <p className="mb-0">{getUserName(selectedTask.uzytkownikId)}</p>
+                        </div>
+                      </div>
+
+                      <div className="row g-3 mb-3">
+                        <div className="col-12 col-lg-8">
+                          <label className="form-label">Przypisz osobę</label>
+                          <select
+                            value={detailAssigneeId}
+                            onChange={(e) => setDetailAssigneeId(e.target.value)}
+                            className="form-select"
+                          >
+                            <option value="">-- wybierz --</option>
+                            {assignableUsers.map((user) => (
+                              <option key={user.id} value={user.id}>
+                                {user.imie} {user.nazwisko} ({user.rola})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="col-12 col-lg-4 d-flex align-items-end">
+                          <button
+                            type="button"
+                            className="btn btn-primary w-100"
+                            onClick={handleAssignUser}
+                          >
+                            Przypisz i ustaw doing
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="row g-3 mb-3">
+                        <div className="col-12 col-lg-8">
+                          <label className="form-label">Zrealizowane roboczogodziny</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={detailHours}
+                            onChange={(e) => setDetailHours(e.target.value)}
+                            className="form-control"
+                          />
+                        </div>
+
+                        <div className="col-12 col-lg-4 d-flex align-items-end">
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary w-100"
+                            onClick={handleSaveDetailHours}
+                          >
+                            Zapisz roboczogodziny
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="d-flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-success"
+                          onClick={handleMarkTaskDone}
+                        >
+                          Oznacz jako done
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                )}
+              </>
+            )}
+          </div>
         </section>
       </div>
     </div>

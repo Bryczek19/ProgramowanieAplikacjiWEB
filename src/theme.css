@@ -1,0 +1,84 @@
+:root {
+  --bg: #f8f9fa;
+  --text: #212529;
+  --card: #ffffff;
+  --border: #dee2e6;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1115;
+  --text: #f8f9fa;
+  --card: #1a1d23;
+  --border: #343a40;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+}
+
+.card-custom {
+  background-color: var(--card);
+  color: var(--text);
+  border-color: var(--border) !important;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-custom:hover {
+  transform: translateY(-2px);
+}
+
+.card-custom .card,
+.card-custom .form-control,
+.card-custom .form-select {
+  background-color: var(--card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.card-custom .form-control::placeholder {
+  color: #6c757d;
+}
+
+[data-theme="dark"] .text-secondary {
+  color: #bfc6cd !important;
+}
+
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select {
+  background-color: #2a2a2a;
+  color: #f8f9fa;
+  border-color: #495057;
+}
+
+[data-theme="dark"] .form-control::placeholder {
+  color: #adb5bd;
+}
+
+[data-theme="dark"] .btn-outline-secondary {
+  color: #f8f9fa;
+  border-color: #6c757d;
+}
+
+[data-theme="dark"] .btn-outline-danger {
+  color: #ffb3b3;
+}
+
+[data-theme="dark"] .btn-outline-primary {
+  color: #9ec5fe;
+}
